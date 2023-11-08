@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Socket.IO chat</title>
+    <style>
+      body { margin: 0; padding-bottom: 3rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+
+      #form { background: rgba(0, 0, 0, 0.15); padding: 0.25rem; position: fixed; bottom: 0; left: 0; right: 0; display: flex; height: 3rem; box-sizing: border-box; backdrop-filter: blur(10px); }
+      #input { border: none; padding: 0 1rem; flex-grow: 1; border-radius: 2rem; margin: 0.25rem; }
+      #input:focus { outline: none; }
+      #form > button { background: #333; border: none; padding: 0 1rem; margin: 0.25rem; border-radius: 3px; outline: none; color: #fff; }
+
+      #messages { list-style-type: none; margin: 0; padding: 0; }
+      #messages > li { padding: 0.5rem 1rem; }
+      #messages > li:nth-child(odd) { background: #efefef; }
+    </style>
+  </head>
+  <body>
+    <div id="user-form">
+      <label for="username">Username:</label>
+      <input type="text" id="username" autocomplete="off" />
+      <button id="join">Join Chat</button>
+    </div>
+    <ul id="messages" style="display: none;"></ul>
+    <form id="form" action="">
+      <input id="input" autocomplete="off" /><button>Send</button>
+    </form>
+    <div id="typing-status"></div>
+    
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      let socket = io();
+      let messages = document.getElementById('messages');
+      let form = document.getElementById('form');
+      let input = document.getElementById('input');
+      let userForm = document.getElementById('user-form');
+      let usernameInput = document.getElementById('username');
+      let joinButton = document.getElementById('join');
+      let username;
+    
+      //Evento para unirse al chat con el username ingresado
+      joinButton.addEventListener('click', () => {
+        username = usernameInput.value;
+        if (username) {
+          userForm.style.display = 'none';
+          messages.style.display = 'block';
+          console.log('Joined as: ' + username);
+        }
+      });
+    
+      //Evento para mostrar los mensajes
+      socket.on('chat message', (mensajesExistentes) => {
+        messages.innerHTML = '';
+        mensajesExistentes.forEach((msg) => {
+          let item = document.createElement('li');
+          item.textContent = msg.username + ': ' + msg.message;
+          messages.appendChild(item);
+        });
+      });
+    
+      //Evento para enviar un mensaje
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (input.value && username) {
+          socket.emit('chat message', { username: username, message: input.value });
+          input.value = '';
+        }
+      });
+
+      //Evento para mostrar el estado de escritura
+      let typing = false;
+      let typingTimeout;
+    
+    
+      input.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') {
+          clearTimeout(typingTimeout);
+          typingTimeout = setTimeout(() => {
+            socket.emit('stopped typing', username);
+          }, 500);
+        } else {
+          if (input.value.trim() !== '') {
+            socket.emit('chat message', { username: username, message: input.value });
+            input.value = '';
+          }
+          e.preventDefault();
+        }
+      });
+    
+      input.addEventListener('keyup', (e) => {
+        if (e.key !== 'Enter') {
+          clearTimeout(typingTimeout);
+          socket.emit('typing', username);
+          typingTimeout = setTimeout(() => {
+            socket.emit('stopped typing', username);
+          }, 500);
+        }
+      });
+    
+      socket.on('user typing', (username) => {
+        let typingStatus = document.getElementById('typing-status');
+        typingStatus.textContent = username + ' está escribiendo...';
+      });
+    
+      socket.on('user stopped typing', (username) => {
+        let typingStatus = document.getElementById('typing-status');
+        typingStatus.textContent = '';
+      });
+    </script>
+    
+    
